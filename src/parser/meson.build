@@ -1,6 +1,7 @@
 sources = [
   'lexer.cpp',
-  'parser.cpp'
+  'parser.cpp',
+  'parser.hpp'
 ]
 
 iodine_parser_include_dir = include_directories('.')

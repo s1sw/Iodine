@@ -1,5 +1,6 @@
 #include <parser.hpp>
 #include <iostream>
+#include <unordered_map>
 
 using namespace iodine;
 
@@ -9,44 +10,38 @@ void printIndents(int indents) {
     }
 }
 
-void printASTNode(ASTNode* node, int indentDepth = 0) {
+const std::unordered_map<ASTNodeType, std::string> typeNames = {
+    { ASTNodeType::IntegerVal, "IntegerVal" },
+    { ASTNodeType::Arithmetic, "Arithmetic" }
+};
+
+void printASTNode(std::shared_ptr<ASTNode> node, int indentDepth = 0) {
     printIndents(indentDepth);
-    std::cout << "Node type: " << (int)node->type << "\n";
+    std::cout << "Node type: " << typeNames.at(node->type) << "\n";
     switch (node->type) {
         case ASTNodeType::IntegerVal:
             printIndents(indentDepth);
-            std::cout << "integer val: " << ((IntegerValueNode*)node)->val << "\n";
+            std::cout << "integer val: " << std::static_pointer_cast<IntegerValueNode>(node)->val << "\n";
             break;
         case ASTNodeType::Arithmetic:
+        {
+            auto aNode = std::static_pointer_cast<ArithmeticNode>(node);
             printIndents(indentDepth);
-            std::cout << "a: ";
-            printASTNode(((ArithmeticNode*)node)->a, indentDepth + 1);
+            std::cout << "a: \n";
+            printASTNode(aNode->a, indentDepth + 1);
 
             printIndents(indentDepth);
-            std::cout << "b: ";
-            printASTNode(((ArithmeticNode*)node)->b, indentDepth + 1);
+            std::cout << "b: \n";
+            printASTNode(aNode->b, indentDepth + 1);
             break;
+        }
         default:
             break;
     }
 }
 
-void evalArithmetic(ArithmeticNode* aNode) {
-    IntegerValueNode* aIVal = (IntegerValueNode*)aNode->a;
-    IntegerValueNode* bIVal = (IntegerValueNode*)aNode->b;
-    switch (aNode->operation) {
-        case ArithmeticOperation::Add:
-            std::cout << aIVal->val + bIVal->val << "\n"; 
-            break;
-    }
-}
-
-void evalAST(ASTNode* exprRoot) {
-    switch (exprRoot->type) {
-        case ASTNodeType::Arithmetic:
-            evalArithmetic((ArithmeticNode*)exprRoot);
-            break;
-    }
+int evalAST(std::shared_ptr<ASTNode> exprRoot) {
+    return std::static_pointer_cast<ProducesIntValueNode>(exprRoot)->getValue();
 }
 
 int main(int argc, char** argv) {
@@ -65,10 +60,10 @@ int main(int argc, char** argv) {
             std::cout << "\n";
         }
 
-        ASTNode* n = parseScript(tokens);
+        std::shared_ptr<ASTNode> n = parseScript(tokens);
 
         printASTNode(n);
-        evalAST(n);
+        std::cout << "FINAL VALUE: " << evalAST(n) << "\n";
     } 
     return 0;
 }

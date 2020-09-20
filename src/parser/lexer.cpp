@@ -11,7 +11,9 @@ namespace iodine {
         { ',', TokenType::Comma },
         { '"', TokenType::DoubleQuote },
         { '+', TokenType::Operator },
-        { '-', TokenType::Operator }
+        { '-', TokenType::Operator },
+        { '*', TokenType::Operator },
+        { '/', TokenType::Operator }
     };
 
     bool isStrNumber(const std::string& str) {
@@ -56,7 +58,10 @@ namespace iodine {
             if (pair != singleCharTokens.end()) {
                 if (!currentText.empty()) {
                     Token newToken;
-                    newToken.type = TokenType::Name;
+                    newToken.type = isStrNumber(currentText) ? TokenType::Number : TokenType::Name;
+                    if (isStrNumber(currentText)) {
+                        newToken.numberVal = std::atoi(currentText.c_str());
+                    }
                     newToken.val = currentText;
                     tokens.push_back(newToken);
                     currentText.clear();

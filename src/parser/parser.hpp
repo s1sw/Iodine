@@ -1,6 +1,7 @@
 #pragma once
 #include <vector>
 #include <string>
+#include <memory>
 
 namespace iodine {
     enum class TokenType {
@@ -33,6 +34,7 @@ namespace iodine {
             ASTNode(ASTNodeType type) : type(type) {}
         public:
             ASTNodeType type;
+            virtual void doNothing() {}
     };
 
     class ScriptNode : public ASTNode {
@@ -41,10 +43,22 @@ namespace iodine {
             std::vector<ASTNode*> children;
     };
 
-    class IntegerValueNode : public ASTNode {
+    class ConstValNode {
+
+    };
+
+    class ProducesIntValueNode : public ASTNode {
+    protected:
+        ProducesIntValueNode(ASTNodeType nodeType) : ASTNode(nodeType) {}
+    public:
+        virtual int getValue() = 0;
+    };
+
+    class IntegerValueNode : public ProducesIntValueNode {
         public:
-            IntegerValueNode(int val = 0) : ASTNode(ASTNodeType::IntegerVal), val(val) {}
+            IntegerValueNode(int val = 0) : ProducesIntValueNode(ASTNodeType::IntegerVal), val(val) {}
             int val;
+            int getValue() override { return val; }
     };
 
     enum class ArithmeticOperation {
@@ -54,12 +68,29 @@ namespace iodine {
         Multiply
     };
 
-    class ArithmeticNode : public ASTNode {
+    class ArithmeticNode : public ProducesIntValueNode {
         public:
-            ArithmeticNode() : ASTNode(ASTNodeType::Arithmetic) {}
-            ASTNode* a;
-            ASTNode* b;
+            ArithmeticNode() : ProducesIntValueNode(ASTNodeType::Arithmetic) {}
+            std::shared_ptr<ProducesIntValueNode> a;
+            std::shared_ptr<ProducesIntValueNode> b;
             ArithmeticOperation operation;
+
+            int calculateValue() {
+                switch (operation) {
+                case ArithmeticOperation::Add:
+                    return a->getValue() + b->getValue();
+                case ArithmeticOperation::Subtract:
+                    return a->getValue() - b->getValue();
+                case ArithmeticOperation::Multiply:
+                    return a->getValue() * b->getValue();
+                case ArithmeticOperation::Divide:
+                    return a->getValue() / b->getValue();
+                }
+            }
+
+            int getValue() override {
+                return calculateValue();
+            }
     };
 
     class VarAssignmentNode : public ASTNode {
@@ -68,5 +99,5 @@ namespace iodine {
     };
 
     std::vector<Token> parseTokens(std::string str); 
-    ASTNode* parseScript(std::vector<Token> tokens);
+    std::shared_ptr<ASTNode> parseScript(std::vector<Token> tokens);
 }
