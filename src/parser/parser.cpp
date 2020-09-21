@@ -94,6 +94,13 @@ namespace iodine {
                     if (b == nullptr) throw std::runtime_error("Expected expression");
 
                     return makeArithmeticNode(*tokenIt, std::static_pointer_cast<ProducesValueNode>(parenthesisNode), std::static_pointer_cast<ProducesValueNode>(b));
+                } else if (tokenIt->type == TokenType::Operator) {
+                    if (tokenIt->val == "+") {
+                        // Unary plus
+
+                    } else if (tokenIt->val == "-") {
+
+                    }
                 } else {
                     throw std::runtime_error("Unexpected token " + tokenIt->val + " (" + tokenNames[tokenIt->type] + ")");
                 }
