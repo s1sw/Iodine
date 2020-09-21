@@ -10,14 +10,9 @@ void printIndents(int indents) {
     }
 }
 
-const std::unordered_map<ASTNodeType, std::string> typeNames = {
-    { ASTNodeType::IntegerVal, "IntegerVal" },
-    { ASTNodeType::Arithmetic, "Arithmetic" }
-};
-
 void printASTNode(std::shared_ptr<ASTNode> node, int indentDepth = 0) {
     printIndents(indentDepth);
-    std::cout << "Node type: " << typeNames.at(node->type) << "\n";
+        std::cout << "Node type: " << nodeTypeNames[node->type] << "\n";
     switch (node->type) {
         case ASTNodeType::IntegerVal:
             printIndents(indentDepth);
@@ -33,6 +28,9 @@ void printASTNode(std::shared_ptr<ASTNode> node, int indentDepth = 0) {
             printIndents(indentDepth);
             std::cout << "b: \n";
             printASTNode(aNode->b, indentDepth + 1);
+
+            printIndents(indentDepth);
+            std::cout << "operation: " << arithOperationNames[aNode->operation] << "\n";
             break;
         }
         default:
@@ -44,6 +42,14 @@ int evalAST(std::shared_ptr<ASTNode> exprRoot) {
     return std::static_pointer_cast<ProducesIntValueNode>(exprRoot)->getValue();
 }
 
+void printTokens(std::vector<Token>& tokens) {
+    for (auto& token : tokens) {
+        std::cout << "Token: " << tokenNames[token.type];
+        std::cout << " (" << token.val << ")";
+        std::cout << "\n";
+    }
+}
+
 int main(int argc, char** argv) {
     while (true) {
         std::string line;
@@ -52,18 +58,21 @@ int main(int argc, char** argv) {
 
         std::getline(std::cin, line);
 
-        std::vector<Token> tokens = parseTokens(line);
+        try {
+            std::vector<Token> tokens = parseTokens(line);
 
-        for (auto& token : tokens) {
-            std::cout << "Token: " << (int)token.type;
-                std::cout << " (" << token.val << ")";
-            std::cout << "\n";
+            std::shared_ptr<ASTNode> n = parseScript(tokens);
+
+            if (n == nullptr) {
+                std::cout << "AST is empty\n";
+            } else {
+                printTokens(tokens);
+                printASTNode(n);
+                std::cout << evalAST(n) << "\n";
+            }
+        } catch (std::exception& e) {
+            std::cout << "Error: " << e.what() << "\n";
         }
-
-        std::shared_ptr<ASTNode> n = parseScript(tokens);
-
-        printASTNode(n);
-        std::cout << "FINAL VALUE: " << evalAST(n) << "\n";
     } 
     return 0;
 }

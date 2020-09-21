@@ -1,9 +1,16 @@
 #pragma once
+#include <initializer_list>
 #include <vector>
 #include <string>
 #include <memory>
+#include <algorithm>
 
 namespace iodine {
+    enum class DataType {
+        Integer,
+        Float
+    };
+
     enum class TokenType {
         Name,
         Semicolon,
@@ -12,13 +19,9 @@ namespace iodine {
         Comma,
         DoubleQuote,
         Number,
-        Operator
-    };
-
-    struct Token {
-        TokenType type;
-        std::string val;
-        int numberVal;
+        DecimalNumber,
+        Operator,
+        Count
     };
 
     enum class ASTNodeType {
@@ -26,7 +29,41 @@ namespace iodine {
         IntegerVal,
         Arithmetic,
         Expression,
-        VarAssignment
+        VarAssignment,
+        Count
+    };
+
+    struct Variable {
+        std::string name;
+        DataType type;
+    };
+
+    template<typename T>
+    class EnumNames {
+    public:
+        EnumNames(const char* names[(int)T::Count]) : names(names) {}
+        EnumNames(std::initializer_list<const char*> iList) {
+            int i = 0;
+            for (auto& val : iList) {
+                names[i] = val;
+                i++;
+            }
+        }
+
+        const char* operator[](T t) {
+            return names[(int)t];
+        }
+    private:
+        const char* names[(int)T::Count];
+    };
+
+    extern EnumNames<TokenType> tokenNames;
+    extern EnumNames<ASTNodeType> nodeTypeNames;
+
+    struct Token {
+        TokenType type;
+        std::string val;
+        int numberVal;
     };
 
     class ASTNode {
@@ -65,8 +102,11 @@ namespace iodine {
         Add,
         Subtract,
         Divide,
-        Multiply
+        Multiply,
+        Count
     };
+
+    extern EnumNames<ArithmeticOperation> arithOperationNames;
 
     class ArithmeticNode : public ProducesIntValueNode {
         public:
@@ -85,6 +125,8 @@ namespace iodine {
                     return a->getValue() * b->getValue();
                 case ArithmeticOperation::Divide:
                     return a->getValue() / b->getValue();
+                default:
+                    return 0;
                 }
             }
 

@@ -25,6 +25,21 @@ namespace iodine {
         return true;
     }
 
+    bool isStrDecimalNumber(const std::string& str) {
+        bool foundDecimalPoint = false;
+        for (const auto& c : str) {
+            if (!std::isdigit(c)) {
+                if (c == '.' && !foundDecimalPoint) {
+                    foundDecimalPoint = true;
+                } else {
+                    return false;
+                }
+            }
+        }
+
+        return foundDecimalPoint;
+    }
+
     std::vector<Token> parseTokens(std::string str) {
         std::vector<Token> tokens;
         std::string currentText;
@@ -51,6 +66,19 @@ namespace iodine {
 
                     continue;
                 }
+
+                if (*charIt == '/' && *(charIt + 1) == '/') {
+                    while (charIt < str.end() - 1) {
+                        if (*charIt == '*' && *(charIt + 1) == '/') {
+                            charIt++;
+                            break;
+                        }
+
+                        charIt++;
+                    }
+
+                    continue;
+                }
             }
 
             auto pair = singleCharTokens.find(*charIt);
@@ -61,6 +89,10 @@ namespace iodine {
                     newToken.type = isStrNumber(currentText) ? TokenType::Number : TokenType::Name;
                     if (isStrNumber(currentText)) {
                         newToken.numberVal = std::atoi(currentText.c_str());
+                    }
+
+                    if (isStrDecimalNumber(currentText)) {
+                        newToken.type = TokenType::DecimalNumber;
                     }
                     newToken.val = currentText;
                     tokens.push_back(newToken);
@@ -82,6 +114,10 @@ namespace iodine {
                     if (isStrNumber(currentText)) {
                         newToken.numberVal = std::atoi(currentText.c_str());
                     }
+
+                    if (isStrDecimalNumber(currentText)) {
+                        newToken.type = TokenType::DecimalNumber;
+                    }
                     newToken.val = currentText;
                     currentText.clear();
                     tokens.push_back(newToken);
@@ -96,9 +132,14 @@ namespace iodine {
             Token newToken;
             newToken.type = isStrNumber(currentText) ? TokenType::Number : TokenType::Name;
             newToken.val = currentText;
-        if (isStrNumber(currentText)) {
+            if (isStrNumber(currentText)) {
                 newToken.numberVal = std::atoi(currentText.c_str());
             }
+
+            if (isStrDecimalNumber(currentText)) {
+                newToken.type = TokenType::DecimalNumber;
+            }
+
             currentText.clear();
             tokens.push_back(newToken);
         }

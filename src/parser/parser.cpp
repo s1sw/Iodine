@@ -1,61 +1,88 @@
 #include "parser.hpp"
+#include <iostream>
+#include <memory>
 #include <stdexcept>
 #include <cassert>
 
 namespace iodine {
     class Parser {
-    public:
-        Parser(std::vector<Token>& tokens) : tokens(tokens) {
-            currentToken = tokens.begin();
+    private:
+        std::shared_ptr<ArithmeticNode> makeArithmeticNode(Token& opToken, std::shared_ptr<ProducesIntValueNode> a, std::shared_ptr<ProducesIntValueNode> b) {
+            assert(opToken.type == TokenType::Operator);
+
+            auto node = std::make_shared<ArithmeticNode>();
+
+            if (opToken.val == "-")
+                node->operation = ArithmeticOperation::Subtract;
+            else if (opToken.val == "+")
+                node->operation = ArithmeticOperation::Add;
+            else if (opToken.val == "*")
+                node->operation = ArithmeticOperation::Multiply;
+            else if (opToken.val == "/")
+                node->operation = ArithmeticOperation::Divide;
+
+            node->a = a;
+            node->b = b;
+            return node;
         }
-        std::vector<Token>& tokens;
-        std::vector<Token>::iterator currentToken;
+    public:
+        Parser() {
+        }
 
         std::shared_ptr<ASTNode> parseExpression(std::vector<Token>::iterator begin, std::vector<Token>::iterator end) {
-            // So, first we're just going to try parsing a basic addition.
-            // This will be a simple set of tokens:
-            // 1. A number
-            // 2. An operation (+, -, *, *)
-            // 3. Another number
-
-            if (begin == end - 1) {
-                if (begin->type == TokenType::Number) {
-                    return std::make_shared<IntegerValueNode>(begin->numberVal);
-                }
-            }
-
-            // Assume this is an expression
+            std::shared_ptr<ASTNode> currNode = nullptr;
             for (auto tokenIt = begin; tokenIt < end; tokenIt++) {
                 if (tokenIt->type == TokenType::Number) {
                     // Tokens that can follow this:
                     // Operator
 
-                    if (tokenIt >= tokens.end() - 1) return std::make_shared<IntegerValueNode>(tokenIt->numberVal);
+                    if (tokenIt == end - 1) return std::make_shared<IntegerValueNode>(tokenIt->numberVal);
 
                     int numVal = tokenIt->numberVal;
 
                     tokenIt++;
-                    if (tokenIt->type != TokenType::Operator) throw std::runtime_error("Expected operator");
+                    if (tokenIt->type != TokenType::Operator) throw std::runtime_error(std::string("Expected operator, found ") + tokenNames[tokenIt->type]);
 
                     // After this, there are actually a few different tokens.
                     // This is a whole other expression. Recurse!
-                    auto subExpr = parseExpression(tokenIt + 1, tokens.end());
-                    
-                    auto aNode = std::make_shared<ArithmeticNode>();
+                    auto subExpr = parseExpression(tokenIt + 1, end);
 
-                    if (tokenIt->val == "-")
-                        aNode->operation = ArithmeticOperation::Subtract;
-                    else if (tokenIt->val == "+")
-                        aNode->operation = ArithmeticOperation::Add;
-                    else if (tokenIt->val == "*")
-                        aNode->operation = ArithmeticOperation::Multiply;
-                    else if (tokenIt->val == "/")
-                        aNode->operation = ArithmeticOperation::Divide;
+                    auto a = std::make_shared<IntegerValueNode>(numVal);
+                    auto b = std::static_pointer_cast<ProducesIntValueNode>(subExpr);
+                    if (b == nullptr) throw std::runtime_error("Expected expression");
 
+                    return makeArithmeticNode(*tokenIt, a, b);
+                } else if (tokenIt->type == TokenType::OpenParenthesis) {
+                    // search forward for close parenthesis
 
-                    aNode->a = std::make_shared<IntegerValueNode>(numVal);
-                    aNode->b = std::static_pointer_cast<ProducesIntValueNode>(subExpr);
-                    return aNode;
+                    std::vector<Token>::iterator closeParenthesisPos = end;
+                    for (auto it2 = tokenIt; it2 < end; it2++) {
+                        if (it2->type == TokenType::CloseParenthesis) {
+                            closeParenthesisPos = it2;
+                        }
+                    } 
+
+                    if (closeParenthesisPos == end)
+                        throw std::runtime_error("Couldn't find close parenthesis");
+
+                    auto parenthesisNode = parseExpression(tokenIt + 1, closeParenthesisPos);
+                    if (parenthesisNode == nullptr) throw std::runtime_error("Expected expression in parenthesis");
+
+                    if (closeParenthesisPos == end - 1)
+                        return parenthesisNode;
+
+                    // look for an operator
+                    tokenIt = closeParenthesisPos + 1;
+
+                    assert(tokenIt->type == TokenType::Operator);
+
+                    auto b = parseExpression(tokenIt + 1, end);
+
+                    if (b == nullptr) throw std::runtime_error("Expected expression");
+
+                    return makeArithmeticNode(*tokenIt, std::static_pointer_cast<ProducesIntValueNode>(parenthesisNode), std::static_pointer_cast<ProducesIntValueNode>(b));
+                } else {
+                    throw std::runtime_error("Unexpected token " + tokenIt->val + " (" + tokenNames[tokenIt->type] + ")");
                 }
             }
 
@@ -64,6 +91,6 @@ namespace iodine {
     };
 
     std::shared_ptr<ASTNode> parseScript(std::vector<Token> tokens) {
-        return Parser(tokens).parseExpression(tokens.begin(), tokens.end());
+        return Parser().parseExpression(tokens.begin(), tokens.end());
     }
 }
