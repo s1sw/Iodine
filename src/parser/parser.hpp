@@ -4,11 +4,13 @@
 #include <string>
 #include <memory>
 #include <algorithm>
+#include <stdexcept>
 
 namespace iodine {
     enum class DataType {
-        Integer,
-        Float
+        Int32,
+        F32,
+        F64
     };
 
     enum class TokenType {
@@ -26,16 +28,144 @@ namespace iodine {
 
     enum class ASTNodeType {
         Script,
-        IntegerVal,
+        ConstVal,
         Arithmetic,
         Expression,
         VarAssignment,
         Count
     };
 
+    inline bool isDecimalType(DataType type) {
+        return type == DataType::F32 || type == DataType::Int32;
+    }
+
+    inline int getTypeBits(DataType type) {
+        switch (type) {
+            case DataType::Int32:
+                return 32;
+            case DataType::F32:
+                return 32;
+            case DataType::F64:
+                return 64;
+        }
+    }
+
+    inline DataType getHighestPrecisionType(DataType a, DataType b) {
+        int bits = std::max(getTypeBits(a), getTypeBits(b));
+        
+        if (isDecimalType(a) || isDecimalType(b))
+            return bits == 32 ? DataType::F32 : DataType::F64;
+        else
+            return DataType::Int32;
+    }
+
+    struct Value {
+        Value() {}
+        Value(int i) : type(DataType::Int32), intVal(i) {}
+        Value(float f) : type(DataType::F32), floatVal(f) {}
+        Value(double d) : type(DataType::F64), doubleVal(d) {}
+        DataType type;
+        union {
+            int intVal;
+            float floatVal;
+            double doubleVal;
+        };
+
+        template <typename T>
+        T as() const {
+            switch (type) {
+                case DataType::Int32:
+                    return (T)intVal;
+                case DataType::F32:
+                    return (T)floatVal;
+                case DataType::F64:
+                    return (T)doubleVal;
+                default:
+                    return T{};
+            }
+        }
+
+        Value as(DataType type) const {
+            switch (type) {
+                case DataType::Int32:
+                    return Value(as<int>());
+                case DataType::F32:
+                    return Value(as<float>());
+                case DataType::F64:
+                    return Value(as<double>());
+                default:
+                    return Value(0);
+            }
+        }
+
+        Value operator*(const Value& other) {
+            if (other.type != type) {
+                DataType newType = getHighestPrecisionType(other.type, type);
+                return other.as(newType) * as(newType);
+            }
+
+            switch (type) {
+                case DataType::Int32:
+                    return other.intVal * intVal;
+                case DataType::F32:
+                    return other.floatVal * floatVal;
+                case DataType::F64:
+                    return other.doubleVal * doubleVal;
+            }
+        }
+
+        Value operator+(const Value& other) {
+            if (other.type != type) {
+                DataType newType = getHighestPrecisionType(other.type, type);
+                return other.as(newType) + as(newType);
+            }
+
+            switch (type) {
+                case DataType::Int32:
+                    return other.intVal + intVal;
+                case DataType::F32:
+                    return other.floatVal + floatVal;
+                case DataType::F64:
+                    return other.doubleVal + doubleVal;
+            }
+        }
+
+        Value operator-(const Value& other) {
+            if (other.type != type) {
+                DataType newType = getHighestPrecisionType(other.type, type);
+                return other.as(newType) - as(newType);
+            }
+
+            switch (type) {
+                case DataType::Int32:
+                    return other.intVal - intVal;
+                case DataType::F32:
+                    return other.floatVal - floatVal;
+                case DataType::F64:
+                    return other.doubleVal - doubleVal;
+            }
+        }
+
+        Value operator/(const Value& other) {
+            if (other.type != type) {
+                DataType newType = getHighestPrecisionType(other.type, type);
+                return other.as(newType) / as(newType);
+            }
+
+            switch (type) {
+                case DataType::Int32:
+                    return other.intVal / intVal;
+                case DataType::F32:
+                    return other.floatVal / floatVal;
+                case DataType::F64:
+                    return other.doubleVal / doubleVal;
+            }
+        }
+    };
+
     struct Variable {
         std::string name;
-        DataType type;
+        Value val;
     };
 
     template<typename T>
@@ -80,22 +210,18 @@ namespace iodine {
             std::vector<ASTNode*> children;
     };
 
-    class ConstValNode {
-
-    };
-
-    class ProducesIntValueNode : public ASTNode {
+    class ProducesValueNode : public ASTNode {
     protected:
-        ProducesIntValueNode(ASTNodeType nodeType) : ASTNode(nodeType) {}
+        ProducesValueNode(ASTNodeType nodeType) : ASTNode(nodeType) {}
     public:
-        virtual int getValue() = 0;
+        virtual Value getValue() = 0;
     };
 
-    class IntegerValueNode : public ProducesIntValueNode {
+    class ConstValNode : public ProducesValueNode {
         public:
-            IntegerValueNode(int val = 0) : ProducesIntValueNode(ASTNodeType::IntegerVal), val(val) {}
-            int val;
-            int getValue() override { return val; }
+            ConstValNode(Value val = 0) : ProducesValueNode(ASTNodeType::ConstVal), val(val) {}
+            Value val;
+            Value getValue() override { return val; }
     };
 
     enum class ArithmeticOperation {
@@ -108,14 +234,14 @@ namespace iodine {
 
     extern EnumNames<ArithmeticOperation> arithOperationNames;
 
-    class ArithmeticNode : public ProducesIntValueNode {
+    class ArithmeticNode : public ProducesValueNode {
         public:
-            ArithmeticNode() : ProducesIntValueNode(ASTNodeType::Arithmetic) {}
-            std::shared_ptr<ProducesIntValueNode> a;
-            std::shared_ptr<ProducesIntValueNode> b;
+            ArithmeticNode() : ProducesValueNode(ASTNodeType::Arithmetic) {}
+            std::shared_ptr<ProducesValueNode> a;
+            std::shared_ptr<ProducesValueNode> b;
             ArithmeticOperation operation;
 
-            int calculateValue() {
+            Value calculateValue() {
                 switch (operation) {
                 case ArithmeticOperation::Add:
                     return a->getValue() + b->getValue();
@@ -130,7 +256,7 @@ namespace iodine {
                 }
             }
 
-            int getValue() override {
+            Value getValue() override {
                 return calculateValue();
             }
     };

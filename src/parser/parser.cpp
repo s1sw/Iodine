@@ -7,7 +7,7 @@
 namespace iodine {
     class Parser {
     private:
-        std::shared_ptr<ArithmeticNode> makeArithmeticNode(Token& opToken, std::shared_ptr<ProducesIntValueNode> a, std::shared_ptr<ProducesIntValueNode> b) {
+        std::shared_ptr<ArithmeticNode> makeArithmeticNode(Token& opToken, std::shared_ptr<ProducesValueNode> a, std::shared_ptr<ProducesValueNode> b) {
             assert(opToken.type == TokenType::Operator);
 
             auto node = std::make_shared<ArithmeticNode>();
@@ -25,6 +25,17 @@ namespace iodine {
             node->b = b;
             return node;
         }
+
+        std::shared_ptr<ConstValNode> tokenToVal(const Token& token) {
+            if (token.type == TokenType::DecimalNumber) {
+                return std::make_shared<ConstValNode>((float)std::atof(token.val.c_str()));
+            } else if (token.type == TokenType::Number) {
+                return std::make_shared<ConstValNode>(token.numberVal);
+            } else {
+                std::cerr << "Warning: Can't deduce value type of token " << tokenNames[token.type] << "\n";
+                return nullptr;
+            }
+        }
     public:
         Parser() {
         }
@@ -32,13 +43,15 @@ namespace iodine {
         std::shared_ptr<ASTNode> parseExpression(std::vector<Token>::iterator begin, std::vector<Token>::iterator end) {
             std::shared_ptr<ASTNode> currNode = nullptr;
             for (auto tokenIt = begin; tokenIt < end; tokenIt++) {
-                if (tokenIt->type == TokenType::Number) {
+                if (tokenIt->type == TokenType::Number || tokenIt->type == TokenType::DecimalNumber) {
                     // Tokens that can follow this:
                     // Operator
 
-                    if (tokenIt == end - 1) return std::make_shared<IntegerValueNode>(tokenIt->numberVal);
+                    if (tokenIt == end - 1) {
+                        return tokenToVal(*tokenIt);
+                    }
 
-                    int numVal = tokenIt->numberVal;
+                    auto valToken = tokenIt;
 
                     tokenIt++;
                     if (tokenIt->type != TokenType::Operator) throw std::runtime_error(std::string("Expected operator, found ") + tokenNames[tokenIt->type]);
@@ -47,8 +60,8 @@ namespace iodine {
                     // This is a whole other expression. Recurse!
                     auto subExpr = parseExpression(tokenIt + 1, end);
 
-                    auto a = std::make_shared<IntegerValueNode>(numVal);
-                    auto b = std::static_pointer_cast<ProducesIntValueNode>(subExpr);
+                    auto a = tokenToVal(*valToken);
+                    auto b = std::static_pointer_cast<ProducesValueNode>(subExpr);
                     if (b == nullptr) throw std::runtime_error("Expected expression");
 
                     return makeArithmeticNode(*tokenIt, a, b);
@@ -80,7 +93,7 @@ namespace iodine {
 
                     if (b == nullptr) throw std::runtime_error("Expected expression");
 
-                    return makeArithmeticNode(*tokenIt, std::static_pointer_cast<ProducesIntValueNode>(parenthesisNode), std::static_pointer_cast<ProducesIntValueNode>(b));
+                    return makeArithmeticNode(*tokenIt, std::static_pointer_cast<ProducesValueNode>(parenthesisNode), std::static_pointer_cast<ProducesValueNode>(b));
                 } else {
                     throw std::runtime_error("Unexpected token " + tokenIt->val + " (" + tokenNames[tokenIt->type] + ")");
                 }

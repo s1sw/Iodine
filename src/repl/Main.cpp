@@ -10,13 +10,28 @@ void printIndents(int indents) {
     }
 }
 
+std::string valueToStr(const Value& val) {
+    switch (val.type) {
+        case DataType::F32:
+            return std::to_string(val.floatVal);
+            break;
+        case DataType::F64:
+            return std::to_string(val.doubleVal);
+        case DataType::Int32:
+            return std::to_string(val.intVal);
+            break;
+        default:
+            return "";
+    }
+}
+
 void printASTNode(std::shared_ptr<ASTNode> node, int indentDepth = 0) {
     printIndents(indentDepth);
         std::cout << "Node type: " << nodeTypeNames[node->type] << "\n";
     switch (node->type) {
-        case ASTNodeType::IntegerVal:
+        case ASTNodeType::ConstVal:
             printIndents(indentDepth);
-            std::cout << "integer val: " << std::static_pointer_cast<IntegerValueNode>(node)->val << "\n";
+            std::cout << "val: " << valueToStr(std::static_pointer_cast<ConstValNode>(node)->val) << "\n";
             break;
         case ASTNodeType::Arithmetic:
         {
@@ -38,8 +53,8 @@ void printASTNode(std::shared_ptr<ASTNode> node, int indentDepth = 0) {
     }
 }
 
-int evalAST(std::shared_ptr<ASTNode> exprRoot) {
-    return std::static_pointer_cast<ProducesIntValueNode>(exprRoot)->getValue();
+Value evalAST(std::shared_ptr<ASTNode> exprRoot) {
+    return std::static_pointer_cast<ProducesValueNode>(exprRoot)->getValue();
 }
 
 void printTokens(std::vector<Token>& tokens) {
@@ -68,7 +83,7 @@ int main(int argc, char** argv) {
             } else {
                 printTokens(tokens);
                 printASTNode(n);
-                std::cout << evalAST(n) << "\n";
+                std::cout << valueToStr(evalAST(n)) << "\n";
             }
         } catch (std::exception& e) {
             std::cout << "Error: " << e.what() << "\n";

@@ -3,7 +3,7 @@
 namespace iodine {
     EnumNames<ASTNodeType> nodeTypeNames {
         "Script",
-        "IntegerVal",
+        "ConstVal",
         "Arithmetic",
         "Expression",
         "VarAssignment"
