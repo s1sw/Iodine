@@ -6,7 +6,9 @@ namespace iodine {
         "ConstVal",
         "Arithmetic",
         "Expression",
-        "VarAssignment"
+        "VarAssignment",
+        "UnaryOp",
+        "VariableReference"
     };
 
     EnumNames<TokenType> tokenNames {
@@ -18,7 +20,8 @@ namespace iodine {
         "DoubleQuote",
         "Number",
         "DecimalNumber",
-        "Operator"
+        "Operator",
+        "Equals"
     };
 
     EnumNames<ArithmeticOperation> arithOperationNames {
@@ -26,5 +29,10 @@ namespace iodine {
         "Subtract",
         "Divide",
         "Multiply"
+    };
+
+    EnumNames<UnaryOperation> unaryOperationNames {
+        "Plus",
+        "Minus"
     };
 }

@@ -13,7 +13,8 @@ namespace iodine {
         { '+', TokenType::Operator },
         { '-', TokenType::Operator },
         { '*', TokenType::Operator },
-        { '/', TokenType::Operator }
+        { '/', TokenType::Operator },
+        { '=', TokenType::Equals }
     };
 
     bool isStrNumber(const std::string& str) {

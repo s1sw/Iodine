@@ -1,3 +1,4 @@
+#include <memory>
 #include <parser.hpp>
 #include <iostream>
 #include <unordered_map>
@@ -25,6 +26,8 @@ std::string valueToStr(const Value& val) {
     }
 }
 
+std::unordered_map<std::string, Value> iodine::variables;
+
 void printASTNode(std::shared_ptr<ASTNode> node, int indentDepth = 0) {
     printIndents(indentDepth);
         std::cout << "Node type: " << nodeTypeNames[node->type] << "\n";
@@ -48,12 +51,49 @@ void printASTNode(std::shared_ptr<ASTNode> node, int indentDepth = 0) {
             std::cout << "operation: " << arithOperationNames[aNode->operation] << "\n";
             break;
         }
+        case ASTNodeType::UnaryOp:
+        {
+            printIndents(indentDepth);
+            auto uNode = std::static_pointer_cast<UnaryOpNode>(node);
+            std::cout << "operation: " << unaryOperationNames[uNode->operation] << "\n";
+            printIndents(indentDepth);
+            std::cout << "child:\n";
+            printASTNode(uNode->valNode, indentDepth + 1);
+            break;
+        }
+        case ASTNodeType::VarAssignment:
+        {
+            printIndents(indentDepth);
+            auto assignmentNode = std::static_pointer_cast<VarAssignmentNode>(node);
+
+            std::cout << "variable name: " << assignmentNode->varName << "\n";
+
+            printIndents(indentDepth);
+            std::cout << "value:\n";
+            printASTNode(assignmentNode->valNode);
+            break;
+        }
+        case ASTNodeType::VariableReference:
+        {
+            printIndents(indentDepth);
+            auto refNode = std::static_pointer_cast<VariableReferenceNode>(node);
+            std::cout << "varname: " << refNode->varName << "\n";
+            printIndents(indentDepth);
+            std::cout << "varinfo:" << (int)variables.at(refNode->varName).type << "\n";
+            break;
+        }
         default:
             break;
     }
 }
 
 Value evalAST(std::shared_ptr<ASTNode> exprRoot) {
+    if (exprRoot->type == ASTNodeType::VarAssignment) {
+        auto assignNode = std::static_pointer_cast<VarAssignmentNode>(exprRoot);
+
+        variables[assignNode->varName] = assignNode->valNode->getValue();
+        return assignNode->valNode->getValue();
+    }
     return std::static_pointer_cast<ProducesValueNode>(exprRoot)->getValue();
 }
 
@@ -72,6 +112,9 @@ int main(int argc, char** argv) {
         std::cout << ">";
 
         std::getline(std::cin, line);
+
+        if (std::cin.eof())
+            break;
 
         try {
             std::vector<Token> tokens = parseTokens(line);

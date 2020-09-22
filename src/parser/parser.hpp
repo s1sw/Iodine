@@ -1,16 +1,19 @@
 #pragma once
+#include <cassert>
 #include <initializer_list>
 #include <vector>
 #include <string>
 #include <memory>
 #include <algorithm>
 #include <stdexcept>
+#include <unordered_map>
 
 namespace iodine {
     enum class DataType {
         Int32,
         F32,
-        F64
+        F64,
+        Ref
     };
 
     enum class TokenType {
@@ -23,6 +26,7 @@ namespace iodine {
         Number,
         DecimalNumber,
         Operator,
+        Equals,
         Count
     };
 
@@ -32,14 +36,17 @@ namespace iodine {
         Arithmetic,
         Expression,
         VarAssignment,
+        UnaryOp,
+        VariableReference,
         Count
     };
 
-    inline bool isDecimalType(DataType type) {
-        return type == DataType::F32 || type == DataType::Int32;
+    inline bool isNumberType(DataType type) {
+      return type == DataType::F32 || type == DataType::Int32 || type == DataType::F64;
     }
 
     inline int getTypeBits(DataType type) {
+        assert(isNumberType(type));
         switch (type) {
             case DataType::Int32:
                 return 32;
@@ -47,17 +54,28 @@ namespace iodine {
                 return 32;
             case DataType::F64:
                 return 64;
+            default:
+                return -1;
         }
     }
 
     inline DataType getHighestPrecisionType(DataType a, DataType b) {
         int bits = std::max(getTypeBits(a), getTypeBits(b));
-        
-        if (isDecimalType(a) || isDecimalType(b))
-            return bits == 32 ? DataType::F32 : DataType::F64;
+
+        if (isNumberType(a) || isNumberType(b))
+          return bits == 32 ? DataType::F32 : DataType::F64;
         else
             return DataType::Int32;
     }
+
+    struct TypeInfo {
+        std::string name;
+    };
+
+    struct Ref {
+        std::shared_ptr<TypeInfo> typeInfo;
+        void* data;
+    };
 
     struct Value {
         Value() {}
@@ -71,8 +89,12 @@ namespace iodine {
             double doubleVal;
         };
 
+        // Declaring outside the union since it has a non-trivial
+        // destructor. Wastes some memory, but oh well!
+        Ref ref;
+
         template <typename T>
-        T as() const {
+       T as() const {
             switch (type) {
                 case DataType::Int32:
                     return (T)intVal;
@@ -82,6 +104,24 @@ namespace iodine {
                     return (T)doubleVal;
                 default:
                     return T{};
+            }
+        }
+
+        void flipSign() {
+            assert(isNumberType(type));
+            switch (type) {
+                case DataType::Int32:
+                    intVal = -intVal;
+                    break;
+                case DataType::F32:
+                    floatVal = -floatVal;
+                    break;
+                case DataType::F64:
+                    doubleVal = -doubleVal;
+                    break;
+                default:
+                    assert(true ^ (bool)"Flipping sign doesn't make sense for this dataType!");;
+                    break;
             }
         }
 
@@ -111,6 +151,8 @@ namespace iodine {
                     return other.floatVal * floatVal;
                 case DataType::F64:
                     return other.doubleVal * doubleVal;
+                default:
+                    return Value{0};
             }
         }
 
@@ -127,6 +169,8 @@ namespace iodine {
                     return other.floatVal + floatVal;
                 case DataType::F64:
                     return other.doubleVal + doubleVal;
+                default:
+                    return Value{0};
             }
         }
 
@@ -138,11 +182,13 @@ namespace iodine {
 
             switch (type) {
                 case DataType::Int32:
-                    return other.intVal - intVal;
+                    return intVal - other.intVal;
                 case DataType::F32:
-                    return other.floatVal - floatVal;
+                    return floatVal - other.floatVal;
                 case DataType::F64:
-                    return other.doubleVal - doubleVal;
+                    return doubleVal - other.doubleVal; 
+                default:
+                    return Value{0};
             }
         }
 
@@ -154,11 +200,13 @@ namespace iodine {
 
             switch (type) {
                 case DataType::Int32:
-                    return other.intVal / intVal;
+                    return intVal / other.intVal; 
                 case DataType::F32:
-                    return other.floatVal / floatVal;
+                    return floatVal / other.floatVal;
                 case DataType::F64:
-                    return other.doubleVal / doubleVal;
+                    return doubleVal / other.doubleVal;
+                default:
+                    return Value{0};
             }
         }
     };
@@ -261,9 +309,48 @@ namespace iodine {
             }
     };
 
+    enum class UnaryOperation {
+        Plus,
+        Minus,
+        Count
+    };
+
+    extern EnumNames<UnaryOperation> unaryOperationNames;
+
+    class UnaryOpNode : public ProducesValueNode {
+        public:
+            UnaryOpNode() : ProducesValueNode(ASTNodeType::UnaryOp) {}
+            std::shared_ptr<ProducesValueNode> valNode;
+            UnaryOperation operation;
+
+            Value getValue() override {
+                Value val = valNode->getValue();
+
+                if (operation == UnaryOperation::Minus) {
+                    val.flipSign();
+                }
+
+                return val;
+            }
+    };
+
     class VarAssignmentNode : public ASTNode {
         public:
-            ASTNode* valueNode;
+            VarAssignmentNode() : ASTNode(ASTNodeType::VarAssignment) {}
+            std::shared_ptr<ProducesValueNode> valNode;
+            std::string varName;
+    };
+
+    extern std::unordered_map<std::string, Value> variables;
+
+    class VariableReferenceNode : public ProducesValueNode {
+        public:
+           VariableReferenceNode() : ProducesValueNode(ASTNodeType::VariableReference) {} 
+           std::string varName;
+
+           Value getValue() override {
+               return variables[varName];
+           }
     };
 
     std::vector<Token> parseTokens(std::string str); 
