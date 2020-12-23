@@ -4,6 +4,7 @@
 #include <parser.hpp>
 #include <iostream>
 #include <unordered_map>
+#include <fstream>
 
 using namespace iodine;
 
@@ -25,13 +26,6 @@ std::string valueToStr(const Value& val) {
             break;
         case DataType::Null:
             return "(null)";
-            break;
-        case DataType::Boolean:
-            return std::to_string(val.boolVal);
-            break;
-        case DataType::ConstStr:
-            return std::string(val.constStrVal);
-            break;
         default:
             return "";
     }
@@ -141,8 +135,8 @@ Value evalAST(std::shared_ptr<ASTNode> exprRoot) {
         if (assignNode->createNew) {
             Variable var;
             var.name = assignNode->varName;
-            var.type = assignNode->type;
-            var.val = val.as(var.type);
+            var.type = val.type;
+            var.val = val;
             variables[assignNode->varName] = var;
         } else {
             auto varIt = variables.find(assignNode->varName);
@@ -181,19 +175,6 @@ void printTokens(std::vector<Token>& tokens) {
 }
 
 int main(int argc, char** argv) {
-    bool doPrintTokens = false;
-    bool printAST = false;
-
-    for (int i = 1; i < argc; i++) {
-        if (strcmp(argv[i], "--print-tokens") == 0) {
-            doPrintTokens = true;
-        }
-
-        if (strcmp(argv[i], "--print-ast") == 0) {
-            printAST = true;
-        }
-    }
-
     Function sqrt {true, "sqrt", [](std::vector<std::shared_ptr<ProducesValueNode>> args) {
         if (args.size() != 1) {
             throw std::runtime_error("incorrect num args");
@@ -203,12 +184,8 @@ int main(int argc, char** argv) {
 
         if (arg->getValue().type == DataType::F32) {
             return Value(sqrtf(arg->getValue().as<float>()));
-        } else if (arg->getValue().type == DataType::F64) {
-            return Value(::sqrt(arg->getValue().as<double>()));
-        } else if (arg->getValue().type == DataType::Int32) {
-            return Value(round(::sqrt(arg->getValue().as<double>())));
         } else {
-            throw std::runtime_error("invalid type!");
+            return Value(::sqrt(arg->getValue().as<double>()));
         }
     }};
 
@@ -222,43 +199,29 @@ int main(int argc, char** argv) {
     functions.insert({ "sqrt", sqrt });
     functions.insert({ "println", println });
 
-    while (true) {
+    std::ifstream scriptStream("script.iod");
+
+    std::string txt;
+
+    while (scriptStream.good()) {
         std::string line;
 
-        std::cout << ">";
+        std::getline(scriptStream, line);
 
-        std::getline(std::cin, line);
+        if (line.empty()) continue;
+        txt += line;
+    }
 
-        if (std::cin.eof())
-            break;
+    try {
+        std::vector<Token> tokens = parseTokens(txt);
+        printTokens(tokens);
 
-        try {
-            if (*(line.end() - 1) == '\n') {
-                line = line.substr(0, line.size() - 1);
-            }
-            std::vector<Token> tokens = parseTokens(line);
+        auto asts = parseScript(tokens);
 
-            if (doPrintTokens)
-                printTokens(tokens);
-
-            std::shared_ptr<ASTNode> n = parseExpression(tokens);
-
-            if (n == nullptr) {
-                std::cout << "AST is empty\n";
-            } else {
-
-                if (printAST)
-                    printASTNode(n);
-
-                Value val = evalAST(n);
-
-                if (val.type != DataType::Null) {
-                    std::cout << valueToStr(val) << "\n";
-                }
-            }
-        } catch (std::exception& e) {
-            std::cout << "Error: " << e.what() << "\n";
+        for (auto& a : asts) {
+            evalAST(a);
         }
-    } 
-    return 0;
+    } catch (std::exception& e) {
+        std::cout << "Error: " << e.what() << "\n";
+    }
 }

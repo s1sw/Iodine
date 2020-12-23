@@ -8,7 +8,10 @@ namespace iodine {
         "Expression",
         "VarAssignment",
         "UnaryOp",
-        "VariableReference"
+        "VariableReference",
+        "FunctionCall",
+        "If",
+        "Comparison"
     };
 
     EnumNames<TokenType> tokenNames {
@@ -21,7 +24,14 @@ namespace iodine {
         "Number",
         "DecimalNumber",
         "Operator",
-        "Equals"
+        "Equals",
+        "If",
+        "OpenBrace",
+        "CloseBrace",
+        "NewLine",
+        "True",
+        "False",
+        "StringContents"
     };
 
     EnumNames<ArithmeticOperation> arithOperationNames {
@@ -34,5 +44,15 @@ namespace iodine {
     EnumNames<UnaryOperation> unaryOperationNames {
         "Plus",
         "Minus"
+    };
+
+    EnumNames<DataType> dataTypeNames {
+        "Int32",
+        "F32",
+        "F64",
+        "Ref",
+        "Boolean",
+        "ConstStr",
+        "Null"
     };
 }

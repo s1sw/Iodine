@@ -1,7 +1,7 @@
 #include "parser.hpp"
 #include <iostream>
-#include <unordered_map>
 #include <stdexcept>
+#include <unordered_map>
 
 namespace iodine {
     std::unordered_map<char, TokenType> singleCharTokens = {
@@ -14,7 +14,16 @@ namespace iodine {
         { '-', TokenType::Operator },
         { '*', TokenType::Operator },
         { '/', TokenType::Operator },
-        { '=', TokenType::Equals }
+        { '=', TokenType::Equals },
+        { '{', TokenType::OpenBrace },
+        { '}', TokenType::CloseBrace },
+        { '\n', TokenType::NewLine }
+    };
+
+    std::unordered_map<std::string, TokenType> keywords = {
+        { "if", TokenType::If },
+        { "true", TokenType::True },
+        { "false", TokenType::False }
     };
 
     bool isStrNumber(const std::string& str) {
@@ -70,7 +79,7 @@ namespace iodine {
 
                 if (*charIt == '/' && *(charIt + 1) == '/') {
                     while (charIt < str.end() - 1) {
-                        if (*charIt == '*' && *(charIt + 1) == '/') {
+                        if (*charIt == '\n') {
                             charIt++;
                             break;
                         }
@@ -85,9 +94,39 @@ namespace iodine {
             auto pair = singleCharTokens.find(*charIt);
 
             if (pair != singleCharTokens.end()) {
+                if (pair->second == TokenType::DoubleQuote) {
+                    std::cout << "parsing str1: charit " << *charIt << "\n";
+                    bool reachedEnd = false;
+                    std::string parsedStr = "";
+                    charIt++;
+                    while (charIt < str.end()) {
+                        if (*charIt == '"') {
+                            reachedEnd = true;
+                            break;
+                        }
+                        parsedStr += *charIt;
+                        charIt++;
+                    } 
+
+                    if (!reachedEnd)
+                        throw std::runtime_error("EOF while parsing string");
+
+                    Token t;
+                    t.type = TokenType::StringContents;
+                    t.val = parsedStr;
+                    tokens.push_back(t);
+                    continue;
+                }
+
                 if (!currentText.empty()) {
+                    auto keywordIt = keywords.find(currentText);
                     Token newToken;
                     newToken.type = isStrNumber(currentText) ? TokenType::Number : TokenType::Name;
+
+                    if (keywordIt != keywords.end()) {
+                        newToken.type = keywordIt->second;
+                    }
+
                     if (isStrNumber(currentText)) {
                         newToken.numberVal = std::atoi(currentText.c_str());
                     }
@@ -96,8 +135,8 @@ namespace iodine {
                         newToken.type = TokenType::DecimalNumber;
                     }
                     newToken.val = currentText;
-                    tokens.push_back(newToken);
                     currentText.clear();
+                    tokens.push_back(newToken);
                 }
 
                 Token newToken;
@@ -107,11 +146,16 @@ namespace iodine {
                 continue;
             }
 
-            if (*charIt == ' ' || *charIt == '\n') {
+            if (*charIt == ' ' || *charIt == ';') {
                 if (!currentText.empty()) {
-                    
+                    auto keywordIt = keywords.find(currentText);
                     Token newToken;
                     newToken.type = isStrNumber(currentText) ? TokenType::Number : TokenType::Name;
+
+                    if (keywordIt != keywords.end()) {
+                        newToken.type = keywordIt->second;
+                    }
+
                     if (isStrNumber(currentText)) {
                         newToken.numberVal = std::atoi(currentText.c_str());
                     }

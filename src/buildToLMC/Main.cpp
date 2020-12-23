@@ -29,9 +29,6 @@ std::string valueToStr(const Value& val) {
         case DataType::Boolean:
             return std::to_string(val.boolVal);
             break;
-        case DataType::ConstStr:
-            return std::string(val.constStrVal);
-            break;
         default:
             return "";
     }
@@ -42,7 +39,7 @@ std::unordered_map<std::string, Function> iodine::functions;
 
 void printASTNode(std::shared_ptr<ASTNode> node, int indentDepth = 0) {
     printIndents(indentDepth);
-    std::cout << "Node type: " << nodeTypeNames[node->type] << "\n";
+        std::cout << "Node type: " << nodeTypeNames[node->type] << "\n";
     switch (node->type) {
         case ASTNodeType::ConstVal:
             printIndents(indentDepth);
@@ -82,7 +79,7 @@ void printASTNode(std::shared_ptr<ASTNode> node, int indentDepth = 0) {
 
             printIndents(indentDepth);
             std::cout << "value:\n";
-            printASTNode(assignmentNode->valNode, indentDepth + 1);
+            printASTNode(assignmentNode->valNode);
             break;
         }
         case ASTNodeType::VariableReference:
@@ -110,23 +107,6 @@ void printASTNode(std::shared_ptr<ASTNode> node, int indentDepth = 0) {
 
                 printASTNode(functionCall->args[i], indentDepth + 1);
             }
-            break;
-        }
-        case ASTNodeType::If:
-        {
-            auto in = std::static_pointer_cast<IfNode>(node);
-            printIndents(indentDepth);
-            std::cout << "condition:\n";
-            printIndents(indentDepth);
-            printASTNode(in->condition, indentDepth + 1);
-
-            printIndents(indentDepth);
-            std::cout << "children:\n";
-            for (auto& n : in->nodes) {
-                printIndents(indentDepth);
-                printASTNode(n, indentDepth + 1);
-            }
-            break;
         }
         default:
             break;
@@ -141,8 +121,8 @@ Value evalAST(std::shared_ptr<ASTNode> exprRoot) {
         if (assignNode->createNew) {
             Variable var;
             var.name = assignNode->varName;
-            var.type = assignNode->type;
-            var.val = val.as(var.type);
+            var.type = val.type;
+            var.val = val;
             variables[assignNode->varName] = var;
         } else {
             auto varIt = variables.find(assignNode->varName);
@@ -158,18 +138,20 @@ Value evalAST(std::shared_ptr<ASTNode> exprRoot) {
         }
         return Value{};
     }
-
-    if (exprRoot->type == ASTNodeType::If) {
-        auto ifNode = std::static_pointer_cast<IfNode>(exprRoot);
-
-        if (ifNode->condition->getValue().as<bool>()) {
-            for (auto& n : ifNode->nodes) {
-                evalAST(n);
-            }
-        }
-        return Value{};
-    }
     return std::static_pointer_cast<ProducesValueNode>(exprRoot)->getValue();
+}
+
+std::vector<Variable> getVarList(std::vector<std::shared_ptr<ASTNode>> nodes) {
+    std::vector<Variable> vars;
+    for (auto& n : nodes) {
+        if (n->type != ASTNodeType::VarAssignment) continue;
+
+        auto varAssign = std::static_pointer_cast<VarAssignmentNode>(n);
+
+        if (!varAssign->createNew) continue;
+
+        vars.push_back(Variable {varAssign->varName}); 
+    }
 }
 
 void printTokens(std::vector<Token>& tokens) {
@@ -203,12 +185,8 @@ int main(int argc, char** argv) {
 
         if (arg->getValue().type == DataType::F32) {
             return Value(sqrtf(arg->getValue().as<float>()));
-        } else if (arg->getValue().type == DataType::F64) {
-            return Value(::sqrt(arg->getValue().as<double>()));
-        } else if (arg->getValue().type == DataType::Int32) {
-            return Value(round(::sqrt(arg->getValue().as<double>())));
         } else {
-            throw std::runtime_error("invalid type!");
+            return Value(::sqrt(arg->getValue().as<double>()));
         }
     }};
 
@@ -238,23 +216,17 @@ int main(int argc, char** argv) {
             }
             std::vector<Token> tokens = parseTokens(line);
 
-            if (doPrintTokens)
-                printTokens(tokens);
-
-            std::shared_ptr<ASTNode> n = parseExpression(tokens);
+            std::shared_ptr<ASTNode> n = parseScript(tokens);
 
             if (n == nullptr) {
                 std::cout << "AST is empty\n";
             } else {
+                if (doPrintTokens)
+                    printTokens(tokens);
 
                 if (printAST)
                     printASTNode(n);
-
-                Value val = evalAST(n);
-
-                if (val.type != DataType::Null) {
-                    std::cout << valueToStr(val) << "\n";
-                }
+                std::cout << valueToStr(evalAST(n)) << "\n";
             }
         } catch (std::exception& e) {
             std::cout << "Error: " << e.what() << "\n";
